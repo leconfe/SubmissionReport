@@ -1,0 +1,14 @@
+{
+    "name": "leconfe/submission-report",
+    "autoload": {
+        "psr-4": {
+            "SubmissionReport\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Leconfe"
+        }
+    ],
+    "require": {}
+}
