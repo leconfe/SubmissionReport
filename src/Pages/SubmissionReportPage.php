@@ -72,88 +72,21 @@ class SubmissionReportPage extends Page implements HasForms
         ]);
     }
 
-    public function report()
-    {
-        $report = Submission::query()
-            ->with([
-                'meta',
-                'participants',
-                'authors',
-                'user',
-                'topics',
-            ])
-            ->withAvg(['reviews' => fn($query) => $query->whereNotNull('date_completed')], 'score')
-            ->orderBy('reviews_avg_score', 'desc')
-            ->limit(5)
-            ->get()
-            ->map(function (Submission $submission) {
-                return [
-                    $submission->getKey(),
-                    $submission->authors->implode(fn(Author $author) => $author->full_name, ', '),
-                    $submission->user->full_name,
-                    $submission->user->email,
-                    $submission->user->getMeta('affiliation'),
-                    $submission->user->getMeta('country'),
-                    $submission->user->getMeta('country') ? Country::where('id', $submission->user->getMeta('country', null))?->value('name') : null,
-                    $submission->getMeta('title'),
-                    implode(", ", $submission->getMeta('keywords') ?? []),
-                    $submission->topics->implode(fn(Topic $topic) => $topic->name, ','),
-                    html_entity_decode(strip_tags($submission->getMeta('abstract'))),
-                    $submission->reviews_avg_score ? round($submission->reviews_avg_score, 1) : null,
-                ];
-            });
-
-
-        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.csv');
-
-        $writer = new \OpenSpout\Writer\CSV\Writer();
-        $writer->openToFile($filename);
-
-        $writer->addRow(Row::fromValues([
-            'id',
-            'authors',
-            'submitter_name',
-            'submitter_email',
-            'submitter_affiliation',
-            'submitter_country_id',
-            'submitter_country',
-            'title',
-            'keywords',
-            'topics',
-            'abstract',
-            'review_score',
-        ]));
-
-        $report->each(fn($data) => $writer->addRow(Row::fromValues($data)));
-
-        $writer->close();
-
-        $csv = file_get_contents($filename);
-
-        unlink($filename);
-
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, 'submissions.csv');
-    }
-
     public static function getRoutePath(): string
     {
         return '/submission-report';
     }
 
-    // public static function canAccess(): bool
-    // {
-    //     return auth()->user()->can('update', app()->getCurrentScheduledConference());
-    // }
+    public static function canAccess(): bool
+    {
+        return auth()->user()->can('update', app()->getCurrentScheduledConference());
+    }
 
     /**
      * @return array<string>
      */
     public function getBreadcrumbs(): array
     {
-        // dd(SubmissionStatus::fromName('OnReview'));
-
         return [];
     }
 
@@ -170,7 +103,7 @@ class SubmissionReportPage extends Page implements HasForms
             ->schema([
                 CheckboxList::make('status')
                     ->label('Select Submission Status that you want to export')
-                    ->options(SubmissionStatus::array())
+                    ->options(array_combine(SubmissionStatus::values(), SubmissionStatus::values()))
                     ->bulkToggleable()
                     ->required(),
                 CheckboxList::make('columns')
