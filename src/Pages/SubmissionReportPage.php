@@ -150,9 +150,9 @@ class SubmissionReportPage extends Page implements HasForms
             ->map(fn(Submission $submission) => collect($data['columns'])->map(fn($column) => $this->getReportColumn($submission, $column))->toArray());
 
 
-        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.csv');
+        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.xlsx');
 
-        $writer = new \OpenSpout\Writer\CSV\Writer();
+        $writer = new \OpenSpout\Writer\XLSX\Writer();
         $writer->openToFile($filename);
 
         $writer->addRow(Row::fromValues($data['columns']));
@@ -167,7 +167,7 @@ class SubmissionReportPage extends Page implements HasForms
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'submissions-' . now()->format('Ymd') . '.csv');
+        }, 'submissions-' . now()->format('Ymd') . '.xlsx');
     }
 
     protected function getReportColumn(Submission $submission, $column){
