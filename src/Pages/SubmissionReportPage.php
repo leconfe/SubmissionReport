@@ -64,6 +64,7 @@ class SubmissionReportPage extends Page implements HasForms
                 'submitter_country_id',
                 'submitter_country',
                 'title',
+                'status',
                 'keywords',
                 'topics',
                 'abstract',
@@ -118,6 +119,7 @@ class SubmissionReportPage extends Page implements HasForms
                         // 'submitter_country_id' => 'Submitter Country ID',
                         'submitter_country' => 'Submitter Country',
                         'title' => "Submission Title",
+                        'status' => "Submission Status",
                         'keywords' => "Keywords",
                         'topics' => "Topics",
                         'abstract' => "Abstract",
@@ -144,8 +146,7 @@ class SubmissionReportPage extends Page implements HasForms
             ->when($data['status'], fn($query) => $query->whereIn('status', $data['status']))
             ->withAvg(['reviews' => fn($query) => $query->whereNotNull('date_completed')], 'score')
             ->orderBy('reviews_avg_score', 'desc')
-            ->limit(5)
-            ->get()
+            ->lazy()
             ->map(fn(Submission $submission) => collect($data['columns'])->map(fn($column) => $this->getReportColumn($submission, $column))->toArray());
 
 
@@ -179,6 +180,7 @@ class SubmissionReportPage extends Page implements HasForms
             'submitter_country_id' => $submission->user->getMeta('country'),
             'submitter_country' =>  $submission->user->getMeta('country') ? Country::where('id', $submission->user->getMeta('country', null))?->value('name') : null,
             'title' => $submission->getMeta('title'),
+            'status' => $submission->status?->value,
             'keywords' => implode(", ", $submission->getMeta('keywords') ?? []),
             'topics' =>  $submission->topics->implode(fn(Topic $topic) => $topic->name, ','),
             'abstract' => html_entity_decode(strip_tags($submission->getMeta('abstract'))),
