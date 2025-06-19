@@ -119,7 +119,7 @@ class SubmissionReportPage extends Page implements HasForms
         $name = implode('-', [
             'submissions',
             app()->getCurrentScheduledConference()->getKey(),
-            now()->format('Ymd'),
+            now()->timestamp,
         ]);
         $filename = Storage::disk('private-files')->path(auth()->user()->id . $name . '.xlsx');
 
