@@ -116,13 +116,18 @@ class SubmissionReportPage extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.xlsx');
+        $name = implode('-', [
+            'submissions',
+            app()->getCurrentScheduledConference()->getKey(),
+            now()->format('Ymd'),
+        ]);
+        $filename = Storage::disk('private-files')->path(auth()->user()->id . $name . '.xlsx');
 
         $writer = new \OpenSpout\Writer\XLSX\Writer();
         $writer->openToFile($filename);
 
         $writer->addRow(Row::fromValues($data['columns']));
-        
+
         Submission::query()
             ->with([
                 'meta',
@@ -146,16 +151,17 @@ class SubmissionReportPage extends Page implements HasForms
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'submissions-' . now()->format('Ymd') . '.xlsx');
+        }, $name . '.xlsx');
     }
 
-    protected function getReportColumn(Submission $submission, $column){
-        return match($column){
+    protected function getReportColumn(Submission $submission, $column)
+    {
+        return match ($column) {
             'id' => $submission->getKey(),
-            'authors' => $submission->authors->implode(fn(Author $author) => Str::squish($author->given_name.' '.$author->family_name), ', '),
-            'editors' => $submission->editors->implode(fn($editor) => Str::squish($editor->user->given_name.' '.$editor->user->family_name), ', '),
-            'reviewers' => $submission->reviews->implode(fn($review) => Str::squish($review->user->given_name.' '.$review->user->family_name), ', '),
-            'submitter_name' => $submission->user->full_name,
+            'authors' => $submission->authors->implode(fn(Author $author) => Str::squish($author->given_name . ' ' . $author->family_name), ', '),
+            'editors' => $submission->editors->implode(fn($editor) => Str::squish($editor->user->given_name . ' ' . $editor->user->family_name), ', '),
+            'reviewers' => $submission->reviews->implode(fn($review) => Str::squish($review->user->given_name . ' ' . $review->user->family_name), ', '),
+            'submitter_name' => Str::squish($submission->user->given_name . ' ' . $submission->user->family_name),
             'submitter_email' =>  $submission->user->email,
             'submitter_affiliation' => $submission->user->getMeta('affiliation'),
             'submitter_country_id' => $submission->user->getMeta('country'),
