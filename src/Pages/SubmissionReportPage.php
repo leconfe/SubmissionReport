@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use OpenSpout\Common\Entity\Row;
 use Squire\Models\Country;
+use Illuminate\Support\Str;
 
 class SubmissionReportPage extends Page implements HasForms
 {
@@ -115,7 +116,14 @@ class SubmissionReportPage extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        $report = Submission::query()
+        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.xlsx');
+
+        $writer = new \OpenSpout\Writer\XLSX\Writer();
+        $writer->openToFile($filename);
+
+        $writer->addRow(Row::fromValues($data['columns']));
+        
+        Submission::query()
             ->with([
                 'meta',
                 'participants',
@@ -128,17 +136,7 @@ class SubmissionReportPage extends Page implements HasForms
             ->withAvg(['reviews' => fn($query) => $query->whereNotNull('date_completed')], 'score')
             ->orderBy('reviews_avg_score', 'desc')
             ->lazy()
-            ->map(fn(Submission $submission) => collect($data['columns'])->map(fn($column) => $this->getReportColumn($submission, $column))->toArray());
-
-
-        $filename = Storage::disk('private-files')->path(auth()->user()->id . '_submission_export.xlsx');
-
-        $writer = new \OpenSpout\Writer\XLSX\Writer();
-        $writer->openToFile($filename);
-
-        $writer->addRow(Row::fromValues($data['columns']));
-
-        $report->each(fn($data) => $writer->addRow(Row::fromValues($data)));
+            ->each(fn(Submission $submission) => $writer->addRow(Row::fromValues(collect($data['columns'])->map(fn($column) => $this->getReportColumn($submission, $column))->toArray())));
 
         $writer->close();
 
@@ -154,9 +152,9 @@ class SubmissionReportPage extends Page implements HasForms
     protected function getReportColumn(Submission $submission, $column){
         return match($column){
             'id' => $submission->getKey(),
-            'authors' => $submission->authors->implode(fn(Author $author) => $author->full_name, ', '),
-            'editors' => $submission->editors->implode(fn($editor) => $editor->user->full_name, ', '),
-            'reviewers' => $submission->reviews->implode(fn($review) => $review->user->full_name, ', '),
+            'authors' => $submission->authors->implode(fn(Author $author) => Str::squish($author->given_name.' '.$author->family_name), ', '),
+            'editors' => $submission->editors->implode(fn($editor) => Str::squish($editor->user->given_name.' '.$editor->user->family_name), ', '),
+            'reviewers' => $submission->reviews->implode(fn($review) => Str::squish($review->user->given_name.' '.$review->user->family_name), ', '),
             'submitter_name' => $submission->user->full_name,
             'submitter_email' =>  $submission->user->email,
             'submitter_affiliation' => $submission->user->getMeta('affiliation'),
