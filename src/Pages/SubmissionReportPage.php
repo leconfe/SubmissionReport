@@ -132,7 +132,7 @@ class SubmissionReportPage extends Page implements HasForms
             ->with([
                 'meta',
                 'participants',
-                'authors',
+                'authors' => fn($query) => $query->ordered(),
                 'editors.user',
                 'user',
                 'topics',
