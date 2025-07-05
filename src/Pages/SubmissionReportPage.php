@@ -36,18 +36,13 @@ class SubmissionReportPage extends Page implements HasForms
             'columns' => [
                 'id',
                 'authors',
-                'editors',
-                'reviews',
                 'submitter_name',
                 'submitter_email',
-                'submitter_affiliation',
-                'submitter_country_id',
-                'submitter_country',
+                'correspondance_author_name',
+                'correspondance_author_email',
                 'title',
                 'status',
-                'keywords',
                 'topics',
-                'abstract',
                 'review_score',
             ]
         ]);
@@ -99,6 +94,8 @@ class SubmissionReportPage extends Page implements HasForms
                         'submitter_email' => 'Submitter Email',
                         'submitter_affiliation' => 'Submitter Affiliation',
                         'submitter_country' => 'Submitter Country',
+                        'correspondance_author_name' => "Correspondance Author Name",
+                        'correspondance_author_email' => "Correspondance Author Email",
                         'title' => "Submission Title",
                         'status' => "Submission Status",
                         'keywords' => "Keywords",
@@ -156,6 +153,12 @@ class SubmissionReportPage extends Page implements HasForms
 
     protected function getReportColumn(Submission $submission, $column)
     {
+        $authorCorrespondanceNameFn = function(Submission $submission){
+            $author = Author::find($submission->getMeta('primary_contact_id'));
+            
+            return $author ? Str::squish($author->given_name . ' ' . $author->family_name) : Str::squish($submission->user->given_name . ' ' . $submission->user->family_name);
+        };
+
         return match ($column) {
             'id' => $submission->getKey(),
             'authors' => $submission->authors->implode(fn(Author $author) => Str::squish($author->given_name . ' ' . $author->family_name), ', '),
@@ -166,6 +169,8 @@ class SubmissionReportPage extends Page implements HasForms
             'submitter_affiliation' => $submission->user->getMeta('affiliation'),
             'submitter_country_id' => $submission->user->getMeta('country'),
             'submitter_country' =>  $submission->user->getMeta('country') ? Country::where('id', $submission->user->getMeta('country', null))?->value('name') : null,
+            'correspondance_author_name' => $authorCorrespondanceNameFn($submission),
+            'correspondance_author_email' => Author::find($submission->getMeta('primary_contact_id'))?->email ?? $submission->user->email,
             'title' => $submission->getMeta('title'),
             'status' => $submission->status?->value,
             'keywords' => implode(", ", $submission->getMeta('keywords') ?? []),
