@@ -42,6 +42,7 @@ class SubmissionReportPage extends Page implements HasForms
                 'correspondance_author_email',
                 'title',
                 'status',
+                'track',
                 'topics',
                 'review_score',
             ]
@@ -98,6 +99,7 @@ class SubmissionReportPage extends Page implements HasForms
                         'correspondance_author_email' => "Correspondance Author Email",
                         'title' => "Submission Title",
                         'status' => "Submission Status",
+                        'track' => "Track",
                         'keywords' => "Keywords",
                         'topics' => "Topics",
                         'abstract' => "Abstract",
@@ -133,6 +135,7 @@ class SubmissionReportPage extends Page implements HasForms
                 'editors.user',
                 'user',
                 'topics',
+                'track',
             ])
             ->when($data['status'], fn($query) => $query->whereIn('status', $data['status']))
             ->withAvg(['reviews' => fn($query) => $query->whereNotNull('date_completed')], 'score')
@@ -173,6 +176,7 @@ class SubmissionReportPage extends Page implements HasForms
             'correspondance_author_email' => Author::find($submission->getMeta('primary_contact_id'))?->email ?? $submission->user->email,
             'title' => $submission->getMeta('title'),
             'status' => $submission->status?->value,
+            'track' => $submission->track?->title,
             'keywords' => implode(", ", $submission->getMeta('keywords') ?? []),
             'topics' =>  $submission->topics->implode(fn(Topic $topic) => $topic->name, ','),
             'abstract' => html_entity_decode(strip_tags($submission->getMeta('abstract'))),
