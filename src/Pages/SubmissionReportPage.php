@@ -4,6 +4,7 @@ namespace SubmissionReport\Pages;
 
 use App\Models\Author;
 use App\Models\Enums\SubmissionStatus;
+use App\Models\Review;
 use App\Models\Submission;
 use App\Models\Topic;
 use Filament\Forms\Components\CheckboxList;
@@ -12,6 +13,7 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use OpenSpout\Common\Entity\Row;
@@ -28,24 +30,33 @@ class SubmissionReportPage extends Page implements HasForms
 
     protected static bool $shouldRegisterNavigation = false;
 
+    protected static array $options = [
+        'id' => 'ID',
+        'authors' => 'Authors',
+        'editors' => "Editors",
+        'reviewers' => "Reviewers",
+        'submitter_name' => 'Submitter Name',
+        'submitter_email' => 'Submitter Email',
+        'submitter_affiliation' => 'Submitter Affiliation',
+        'submitter_country' => 'Submitter Country',
+        'submitter_phone' => 'Submitter Phone',
+        'correspondance_author_name' => "Correspondance Author Name",
+        'correspondance_author_email' => "Correspondance Author Email",
+        'title' => "Submission Title",
+        'status' => "Submission Status",
+        'track' => "Track",
+        'keywords' => "Keywords",
+        'topics' => "Topics",
+        'abstract' => "Abstract",
+        'average_score' => "Average Score",
+    ];
+
     public array $formData = [];
 
     public function mount(): void
     {
         $this->form->fill([
-            'columns' => [
-                'id',
-                'authors',
-                'submitter_name',
-                'submitter_email',
-                'correspondance_author_name',
-                'correspondance_author_email',
-                'title',
-                'status',
-                'track',
-                'topics',
-                'review_score',
-            ]
+            'columns' => array_keys(static::$options),
         ]);
     }
 
@@ -86,27 +97,8 @@ class SubmissionReportPage extends Page implements HasForms
                 CheckboxList::make('columns')
                     ->required()
                     ->label('Select Columns to be exported')
-                    ->options([
-                        'id' => 'ID',
-                        'authors' => 'Authors',
-                        'editors' => "Editors",
-                        'reviews' => "Reviewers",
-                        'submitter_name' => 'Submitter Name',
-                        'submitter_email' => 'Submitter Email',
-                        'submitter_affiliation' => 'Submitter Affiliation',
-                        'submitter_country' => 'Submitter Country',
-                        'correspondance_author_name' => "Correspondance Author Name",
-                        'correspondance_author_email' => "Correspondance Author Email",
-                        'title' => "Submission Title",
-                        'status' => "Submission Status",
-                        'track' => "Track",
-                        'keywords' => "Keywords",
-                        'topics' => "Topics",
-                        'abstract' => "Abstract",
-                        'review_score' => "Review Score",
-                    ])
+                    ->options(static::$options)
                     ->bulkToggleable()
-
             ])
             ->statePath('formData');
     }
@@ -122,12 +114,32 @@ class SubmissionReportPage extends Page implements HasForms
         ]);
         $filename = Storage::disk('private-files')->path(auth()->user()->id . $name . '.xlsx');
 
+        $columns = $data['columns'];
+        $isReviewersIncluded = in_array('reviewers', $columns);
+        if ($isReviewersIncluded) {
+            $maxReviewers = DB::table('reviews')
+                ->selectRaw('submission_id, COUNT(*) as count')
+                ->groupBy('submission_id')
+                ->orderBy('count', 'desc')
+                ->first();
+
+            for ($i = 1; $i <= $maxReviewers->count; $i++) {
+                $columns[] = 'reviewer_' . $i . '_name';
+                $columns[] = 'reviewer_' . $i . '_score';
+            }
+
+            // Remove 'reviewers' from columns as we will handle it differently
+            $columns = array_filter($columns, fn($column) => $column !== 'reviewers');
+            $data['columns']  = array_filter($data['columns'], fn($column) => $column !== 'reviewers');
+        }
+
+
         $writer = new \OpenSpout\Writer\XLSX\Writer();
         $writer->openToFile($filename);
 
-        $writer->addRow(Row::fromValues($data['columns']));
+        $writer->addRow(Row::fromValues($columns));
 
-        Submission::query()
+        $submissions = Submission::query()
             ->with([
                 'meta',
                 'participants',
@@ -136,12 +148,29 @@ class SubmissionReportPage extends Page implements HasForms
                 'user',
                 'topics',
                 'track',
+                'reviews.user',
             ])
             ->when($data['status'], fn($query) => $query->whereIn('status', $data['status']))
             ->withAvg(['reviews' => fn($query) => $query->whereNotNull('date_completed')], 'score')
             ->orderBy('reviews_avg_score', 'desc')
-            ->lazy()
-            ->each(fn(Submission $submission) => $writer->addRow(Row::fromValues(collect($data['columns'])->map(fn($column) => $this->getReportColumn($submission, $column))->toArray())));
+            ->lazy();
+
+
+        foreach ($submissions as $submission) {
+            $rowData = [];
+            foreach ($data['columns'] as $column) {
+                $rowData[] = $this->getReportColumn($submission, $column);
+            }
+            if($isReviewersIncluded) { 
+                foreach ($submission->reviews as $review) {
+                    $rowData[] = Str::squish($review->user->given_name . ' ' . $review->user->family_name);
+                    $rowData[] = $review->score;
+                }
+            }
+
+            $writer->addRow(Row::fromValues($rowData));
+        }
+
 
         $writer->close();
 
@@ -156,9 +185,9 @@ class SubmissionReportPage extends Page implements HasForms
 
     protected function getReportColumn(Submission $submission, $column)
     {
-        $authorCorrespondanceNameFn = function(Submission $submission){
+        $authorCorrespondanceNameFn = function (Submission $submission) {
             $author = Author::find($submission->getMeta('primary_contact_id'));
-            
+
             return $author ? Str::squish($author->given_name . ' ' . $author->family_name) : Str::squish($submission->user->given_name . ' ' . $submission->user->family_name);
         };
 
@@ -172,6 +201,7 @@ class SubmissionReportPage extends Page implements HasForms
             'submitter_affiliation' => $submission->user->getMeta('affiliation'),
             'submitter_country_id' => $submission->user->getMeta('country'),
             'submitter_country' =>  $submission->user->getMeta('country') ? Country::where('id', $submission->user->getMeta('country', null))?->value('name') : null,
+            'submitter_phone' =>  $submission->user->getMeta('phone'),
             'correspondance_author_name' => $authorCorrespondanceNameFn($submission),
             'correspondance_author_email' => Author::find($submission->getMeta('primary_contact_id'))?->email ?? $submission->user->email,
             'title' => $submission->getMeta('title'),
@@ -180,7 +210,7 @@ class SubmissionReportPage extends Page implements HasForms
             'keywords' => implode(", ", $submission->getMeta('keywords') ?? []),
             'topics' =>  $submission->topics->implode(fn(Topic $topic) => $topic->name, ','),
             'abstract' => html_entity_decode(strip_tags($submission->getMeta('abstract'))),
-            'review_score' => $submission->reviews_avg_score ? round($submission->reviews_avg_score, 1) : null,
+            'average_score' => $submission->reviews_avg_score ? round($submission->reviews_avg_score, 1) : null,
             default => null,
         };
     }
