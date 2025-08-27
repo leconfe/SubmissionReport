@@ -1,4 +1,6 @@
 name: 'Submission Report Plugin'
 folder: SubmissionReport
 author: 'Leconfe'
-version: 1.0.4
+version: 1.0.5
+targets: 
+  - scheduled-conference
