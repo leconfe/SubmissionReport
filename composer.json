@@ -1,5 +1,6 @@
 {
     "name": "leconfe/submission-report",
+    "version": "1.1.0",
     "description": "Submission Report plugin for Leconfe scheduled conferences.",
     "license": "proprietary",
     "autoload": {
@@ -12,7 +13,17 @@
             "name": "Leconfe"
         }
     ],
-    "require": {},
+    "require": {
+        "php": "^8.2 || ^8.3 || ^8.4"
+    },
+    "extra": {
+        "leconfe": {
+            "versions": "^1.6",
+            "php": "^8.2",
+            "laravel": "^13.0",
+            "filament": "^5.0"
+        }
+    },
     "scripts": {
         "test": "@php ../../vendor/bin/phpunit -c phpunit.xml"
     }
