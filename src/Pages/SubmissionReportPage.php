@@ -70,7 +70,7 @@ class SubmissionReportPage extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return auth()->user()->can('update', app()->getCurrentScheduledConference());
+        return auth()->user()->can('Plugin:viewAny');
     }
 
     /**

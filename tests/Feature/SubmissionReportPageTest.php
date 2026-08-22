@@ -4,6 +4,7 @@ namespace SubmissionReport\Tests\Feature;
 
 use App\Models\Conference;
 use App\Models\Enums\SubmissionStatus;
+use App\Models\Permission;
 use App\Models\ScheduledConference;
 use App\Models\Submission;
 use App\Models\SubmissionFormItem;
@@ -12,11 +13,35 @@ use App\Models\User;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use SubmissionReport\Pages\SubmissionReportPage;
 use Tests\TestCase;
 
 class SubmissionReportPageTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_submission_report_access_requires_plugin_view_permission(): void
+    {
+        $context = $this->makeSubmissionContext();
+        Permission::query()->firstOrCreate([
+            'name' => 'Plugin:viewAny',
+            'guard_name' => 'web',
+        ]);
+
+        $this->actingAs($context['user']);
+        $this->assertFalse(SubmissionReportPage::canAccess());
+
+        $viewer = User::query()->create([
+            'given_name' => 'Plugin',
+            'family_name' => 'Viewer',
+            'email' => 'plugin-viewer@example.test',
+            'password' => 'password123456',
+        ]);
+        $viewer->givePermissionTo('Plugin:viewAny');
+
+        $this->actingAs($viewer);
+        $this->assertTrue(SubmissionReportPage::canAccess());
+    }
 
     public function test_submission_report_offers_non_upload_custom_fields_as_columns(): void
     {
