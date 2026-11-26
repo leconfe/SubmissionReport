@@ -1,4 +1,4 @@
-# Submission Report 1.1.0
+# Submission Report 1.0.8
 
 Export submission data and reviewer feedback from the scheduled conference's
 **Submission Report** plugin page. This update is contained in the plugin and
