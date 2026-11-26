@@ -1,14 +1,8 @@
 <x-filament-panels::page>
-	<div class="">
-		<x-filament::section>
-			<form wire:submit='submit'>
-				<div class="space-y-4">
-					{{ $this->form }}
-					<x-filament::button type="submit">
-						Export
-					</x-filament::button>
-				</div>
-			</form>
-		</x-filament::section>
-	</div>
+    <form wire:submit="submit" class="space-y-6">
+        {{ $this->form }}
+        <x-filament::button type="submit" icon="heroicon-o-arrow-down-tray" wire:loading.attr="disabled" wire:target="submit">
+            Export Excel
+        </x-filament::button>
+    </form>
 </x-filament-panels::page>

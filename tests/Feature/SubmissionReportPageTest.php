@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Database\Query\Grammars\PostgresGrammar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use SubmissionReport\Pages\SubmissionReportPage;
 use Tests\TestCase;
 
@@ -107,6 +108,7 @@ class SubmissionReportPageTest extends TestCase
     public function test_submission_report_exports_blank_cell_for_missing_custom_field_response(): void
     {
         $context = $this->makeSubmissionContext();
+        $this->grantReportAccess($context['user']);
         $textField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_TEXT, 'Institutional affiliation', 1);
         $context['submission']->update(['status' => SubmissionStatus::Incomplete]);
         $this->actingAs($context['user']);
@@ -135,6 +137,7 @@ class SubmissionReportPageTest extends TestCase
     public function test_submission_report_exports_custom_field_headers_and_values(): void
     {
         $context = $this->makeSubmissionContext();
+        $this->grantReportAccess($context['user']);
         $textField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_TEXT, 'Institutional affiliation', 1);
         $checkboxField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_CHECKBOX, 'Participation type', 2);
         $context['submission']->update(['status' => SubmissionStatus::Incomplete]);
@@ -181,6 +184,7 @@ class SubmissionReportPageTest extends TestCase
     public function test_submission_report_exports_custom_fields_with_postgres_query_grammar(): void
     {
         $context = $this->makeSubmissionContext();
+        $this->grantReportAccess($context['user']);
         $textField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_TEXT, 'Institutional affiliation', 1);
         $context['submission']->update(['status' => SubmissionStatus::Incomplete]);
         $context['submission']->setMeta('submission_form_responses', [
@@ -207,9 +211,10 @@ class SubmissionReportPageTest extends TestCase
         $this->assertSame(['Example University'], $rows[1]);
     }
 
-    public function test_submission_report_ignores_upload_columns_during_export(): void
+    public function test_submission_report_rejects_upload_columns_during_export(): void
     {
         $context = $this->makeSubmissionContext();
+        $this->grantReportAccess($context['user']);
         $uploadField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_UPLOAD, 'Supporting document', 1);
         $context['submission']->update(['status' => SubmissionStatus::Incomplete]);
         $context['submission']->setMeta('submission_form_responses', [
@@ -217,20 +222,18 @@ class SubmissionReportPageTest extends TestCase
         ]);
         $this->actingAs($context['user']);
 
-        $response = $this->reportPage()->exportReport([
+        $this->expectException(ValidationException::class);
+
+        $this->reportPage()->exportReport([
             'status' => [SubmissionStatus::Incomplete->value],
             'columns' => ['id', 'submission_form_response_'.$uploadField->getKey()],
         ]);
-
-        $rows = $this->readRowsFromResponse($response);
-
-        $this->assertSame(['id'], $rows[0]);
-        $this->assertSame([$context['submission']->getKey()], $rows[1]);
     }
 
     public function test_submission_report_escapes_custom_field_spreadsheet_formulas(): void
     {
         $context = $this->makeSubmissionContext();
+        $this->grantReportAccess($context['user']);
         $textField = $this->makeFormItem($context['scheduledConference'], SubmissionFormItem::TYPE_TEXT, '=Custom field', 1);
         $context['submission']->update(['status' => SubmissionStatus::Incomplete]);
         $context['submission']->setMeta('submission_form_responses', [
@@ -314,6 +317,15 @@ class SubmissionReportPageTest extends TestCase
                 return $this->export($data);
             }
         };
+    }
+
+    protected function grantReportAccess(User $user): void
+    {
+        Permission::query()->firstOrCreate([
+            'name' => 'Plugin:viewAny',
+            'guard_name' => 'web',
+        ]);
+        $user->givePermissionTo('Plugin:viewAny');
     }
 
     protected function makeSubmissionContext(): array

@@ -14,6 +14,7 @@
     ],
     "require": {},
     "scripts": {
-        "test": "@php ../../vendor/bin/phpunit -c phpunit.xml"
+        "test": "@php tests/run.php",
+        "test:phpunit": "@php ../../vendor/bin/phpunit -c phpunit.xml"
     }
 }
